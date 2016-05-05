@@ -1,7 +1,8 @@
 extends Reference
 
-const FORMAT_XML  = 0
-const FORMAT_JSON = 1
+const FORMAT_TEXTURE_PACKER_XML  = 0
+const FORMAT_TEXTURE_JSON = 1
+const FORMAT_ATTILA_JSON = 2
 
 var imagePath = ""
 var width = 0
@@ -13,7 +14,7 @@ class SpirteFrame extends Reference:
 	var region = Rect2(0, 0, 0, 0)
 	var originFrame = Rect2(0, 0, 0, 0)
 	var pivot = Vector2(0, 0)
-	var rotated = false
+	var rotate = 0
 
 
 func loadFromFile(path, format):
@@ -27,10 +28,12 @@ func loadFromFile(path, format):
 
 func parse(fileContent, format):
 	var atlas = null
-	if format == FORMAT_XML:
-		atlas = _parseXML(fileContent)
-	elif format == FORMAT_JSON:
-		atlas = _parseJson(fileContent)
+	if format == FORMAT_TEXTURE_PACKER_XML:
+		atlas = _parseTexturePackerXML(fileContent)
+	elif format == FORMAT_TEXTURE_JSON:
+		atlas = _parseTexturePackerJson(fileContent)
+	elif format == FORMAT_ATTILA_JSON:
+		atlas = _parseAttilaJson(fileContent)
 	if atlas != null:
 		self.imagePath = atlas["imagePath"]
 		self.width = atlas["width"]
@@ -42,11 +45,12 @@ func parse(fileContent, format):
 			sprite.region = Rect2( f["x"] , f["y"], f["width"], f["height"])
 			sprite.originFrame = Rect2( f["orignX"] , f["orignY"], f["orignWidth"], f["orignHeight"])
 			sprite.pivot = Vector2(f["pivotX"], f["pivotY"])
-			sprite.rotated = f["rotated"]
+			if f["rotated"]:
+				sprite.rotate = deg2rad(90)
 			self.sprites.append(sprite)
 	return self
 
-func _parseXML(xmlContent):
+func _parseTexturePackerXML(xmlContent):
 	"""
 	Parse Atlas from XML content which is exported with TexturePacker as "XML(generic)"
 	"""
@@ -97,7 +101,7 @@ func _parseXML(xmlContent):
 			err = xmlParser.read()
 	return atlas
 
-func _parseJson(jsonContent):
+func _parseTexturePackerJson(jsonContent):
 	"""
 	Parse Atlas from json content which is exported from TexturePacker as "JSON"
 	"""
@@ -128,4 +132,37 @@ func _parseJson(jsonContent):
 				sprite["orignHeight"] = f["spriteSourceSize"]["h"]
 				sprite["rotated"] = f["rotated"]
 				sprites.append(sprite)
+	return atlas
+
+func _parseAttilaJson(jsonContent):
+	"""
+	Parse Atlas from json content which is exported from Attila
+	"""
+	var atlas = null
+	var sprites = []
+	var jsonParser = {}
+	if OK == jsonParser.parse_json(jsonContent):
+		atlas = {}
+		atlas["sprites"] = sprites
+		for key in jsonParser.keys():
+			var sprite = {}
+			var f = jsonParser[key]
+			sprite["name"] = key
+			sprite["x"] = f["x"]
+			sprite["y"] = f["y"]
+			sprite["width"] = f["w"]
+			sprite["height"] = f["h"]
+			sprite["pivotX"] = 0
+			sprite["pivotY"] = 0
+			sprite["orignX"] = 0
+			sprite["orignY"] = 0
+			sprite["orignWidth"] = f["w"]
+			sprite["orignHeight"] = f["h"]
+			sprite["rotated"] = deg2rad(f["rotate"])
+			sprites.append(sprite)
+
+		if sprites.size() > 0:
+			atlas["imagePath"] = jsonParser[jsonParser.keys()[0]]["dst"]
+		atlas["width"] = 0
+		atlas["height"] = 0
 	return atlas
