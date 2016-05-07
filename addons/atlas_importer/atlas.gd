@@ -14,7 +14,7 @@ class SpirteFrame extends Reference:
 	var region = Rect2(0, 0, 0, 0)
 	var originFrame = Rect2(0, 0, 0, 0)
 	var pivot = Vector2(0, 0)
-	var rotate = 0
+	var rotation = 0
 
 
 func loadFromFile(path, format):
@@ -28,6 +28,7 @@ func loadFromFile(path, format):
 
 func parse(fileContent, format):
 	var atlas = null
+	self.sprites.clear()
 	if format == FORMAT_TEXTURE_PACKER_XML:
 		atlas = _parseTexturePackerXML(fileContent)
 	elif format == FORMAT_TEXTURE_JSON:
@@ -35,19 +36,21 @@ func parse(fileContent, format):
 	elif format == FORMAT_ATTILA_JSON:
 		atlas = _parseAttilaJson(fileContent)
 	if atlas != null:
-		self.imagePath = atlas["imagePath"]
-		self.width = atlas["width"]
-		self.height = atlas["height"]
-		self.sprites.clear()
-		for f in atlas["sprites"]:
-			var sprite = SpirteFrame.new()
-			sprite.name = f["name"]
-			sprite.region = Rect2( f["x"] , f["y"], f["width"], f["height"])
-			sprite.originFrame = Rect2( f["orignX"] , f["orignY"], f["orignWidth"], f["orignHeight"])
-			sprite.pivot = Vector2(f["pivotX"], f["pivotY"])
-			if f["rotated"]:
-				sprite.rotate = deg2rad(90)
-			self.sprites.append(sprite)
+		if atlas.has("imagePath"):
+			self.imagePath = atlas["imagePath"]
+		if atlas.has("width"):
+			self.width = atlas["width"]
+		if atlas.has("height"):
+			self.height = atlas["height"]
+		if atlas.has("sprites"):
+			for f in atlas["sprites"]:
+				var sprite = SpirteFrame.new()
+				sprite.name = f["name"]
+				sprite.region = Rect2( f["x"] , f["y"], f["width"], f["height"])
+				sprite.originFrame = Rect2( f["orignX"] , f["orignY"], f["orignWidth"], f["orignHeight"])
+				sprite.pivot = Vector2(f["pivotX"], f["pivotY"])
+				sprite.rotation = f["rotation"]
+				self.sprites.append(sprite)
 	return self
 
 func _parseTexturePackerXML(xmlContent):
@@ -93,10 +96,10 @@ func _parseTexturePackerXML(xmlContent):
 						sprite["orignHeight"] = xmlParser.get_named_attribute_value("oH")
 					else:
 						sprite["orignHeight"] = 0.0
-					if xmlParser.has_attribute("r"):
-						sprite["rotated"] = (xmlParser.get_named_attribute_value("r") == "y")
+					if xmlParser.has_attribute("r") and xmlParser.get_named_attribute_value("r") == "y":
+						sprite["rotation"] = deg2rad(90)
 					else:
-						sprite["rotated"] = false
+						sprite["rotation"] = 0
 					sprites.append(sprite)
 			err = xmlParser.read()
 	return atlas
@@ -130,7 +133,9 @@ func _parseTexturePackerJson(jsonContent):
 				sprite["orignY"] = f["spriteSourceSize"]["y"]
 				sprite["orignWidth"] = f["spriteSourceSize"]["w"]
 				sprite["orignHeight"] = f["spriteSourceSize"]["h"]
-				sprite["rotated"] = f["rotated"]
+				sprite["rotation"] = 0
+				if f["rotated"]:
+					sprite["rotation"] = deg2rad(90)
 				sprites.append(sprite)
 	return atlas
 
@@ -143,26 +148,30 @@ func _parseAttilaJson(jsonContent):
 	var jsonParser = {}
 	if OK == jsonParser.parse_json(jsonContent):
 		atlas = {}
-		atlas["sprites"] = sprites
-		for key in jsonParser.keys():
-			var sprite = {}
-			var f = jsonParser[key]
-			sprite["name"] = key
-			sprite["x"] = f["x"]
-			sprite["y"] = f["y"]
-			sprite["width"] = f["w"]
-			sprite["height"] = f["h"]
-			sprite["pivotX"] = 0
-			sprite["pivotY"] = 0
-			sprite["orignX"] = 0
-			sprite["orignY"] = 0
-			sprite["orignWidth"] = f["w"]
-			sprite["orignHeight"] = f["h"]
-			sprite["rotated"] = deg2rad(f["rotate"])
-			sprites.append(sprite)
-
-		if sprites.size() > 0:
-			atlas["imagePath"] = jsonParser[jsonParser.keys()[0]]["dst"]
-		atlas["width"] = 0
-		atlas["height"] = 0
+		var keys = jsonParser.keys()
+		if keys.size() > 0:
+			if jsonParser[keys[0]].has("dst") and jsonParser[keys[0]].has("hash"):
+				atlas["imagePath"] = jsonParser[keys[0]]["dst"]
+				atlas["sprites"] = sprites
+				for key in keys:
+					var sprite = {}
+					var f = jsonParser[key]
+					sprite["name"] = key
+					sprite["x"] = f["x"]
+					sprite["y"] = f["y"]
+					sprite["width"] = f["w"]
+					sprite["height"] = f["h"]
+					sprite["pivotX"] = 0
+					sprite["pivotY"] = 0
+					sprite["orignX"] = 0
+					sprite["orignY"] = 0
+					sprite["orignWidth"] = f["w"]
+					sprite["orignHeight"] = f["h"]
+					sprite["rotation"] = -deg2rad(f["rotate"])
+					if f["rotate"] == 90:
+						sprite["width"] = f["h"]
+						sprite["height"] = f["w"]
+					sprites.append(sprite)
+				atlas["width"] = 0
+				atlas["height"] = 0
 	return atlas
