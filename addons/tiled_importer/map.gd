@@ -6,7 +6,9 @@ const FORMAT_JSON = 1
 var metaFilePath = null
 var tileset = TileSet.new()
 var textureMap = {}
+var textures = []
 var layers = []
+var md5 = ""
 
 func _getParentDir(path):
 	var fileName = path.substr(0, path.find_last("/"))
@@ -60,30 +62,46 @@ func _exportDictionary(d):
 func loadFromFile(path):
 	var meta = null
 	var file = File.new()
-	file.open(path, File.READ)
-	if file.is_open():
-		metaFilePath = path
-		var fileContent = file.get_as_text()
-		meta = _parse(fileContent, FORMAT_TMX)
-	file.close()
-	return (meta != null)
+	var newMd5 = file.get_md5(path)
+	if md5 != newMd5:
+		file.open(path, File.READ)
+		if file.is_open():
+			metaFilePath = path
+			var format = FORMAT_TMX
+			if path.ends_with(".json"):
+				format = FORMAT_JSON
+			meta = _parse(file.get_as_text(), format)
+		file.close()
+		if meta != null:
+			md5 = newMd5
+			return true
+		else:
+			return false
+	else:
+		return true
 
 func _parse(fileContent, format):
 	var meta = null
 	if format == FORMAT_TMX:
 		meta = _parseXMLContent(fileContent)
+	elif format == FORMAT_JSON:
+		meta = null
 	if meta != null:
 		tileset.clear()
-		textureMap.clear()
+		textures.clear()
 		layers = []
 		var metaDir = _getParentDir(metaFilePath)
 		var tileCount = 0
 		# Create tileset
+		if meta["tilesets"].size() == 0:
+			return null
 		for ts in meta["tilesets"]:
 			for t in ts["tiles"]:
 				var texturePath = _pathJoin(metaDir, t["source"])
-				if not textureMap.has(texturePath):
-					textureMap[texturePath] = load(texturePath)
+				if textures.find(texturePath) == -1:
+					textures.append(texturePath)
+					if not textureMap.has(texturePath):
+						textureMap[texturePath] = load(texturePath)
 				var id = t["id"]
 				tileset.create_tile(id)
 				tileset.tile_set_texture(id, textureMap[texturePath])
@@ -110,28 +128,27 @@ func _parse(fileContent, format):
 			layer.set_tileset(tileset)
 
 			var gidata = l["data"]["content"]
+			if gidata.size()==0 or gidata.size() != l["height"]*l["width"]:
+				return null
 			for y in range(l["height"]):
 				for x in range(l["width"]):
 					layer.set_cell(x, y, gidata[y * l["width"] + x])
 			layers.append(layer)
-
 	return meta
 
-func save(path):
-	for k in textureMap:
-		ResourceSaver.save(str(path,"/",_getFileName(k),".tex"), textureMap[k])
-	# Save tileset
-	ResourceSaver.save(str(path,"/", "tilesets" ,".res"), tileset)
-	# Save layers
-	var packer = PackedScene.new()
-	var node = Node2D.new()
-	for l in layers:
-		node.add_child(l)
-		l.set_owner(node)
-	packer.pack(node)
-	ResourceSaver.save(str(path,"/", "tilemap",".tscn"), packer)
+################################# GID Parser ##################################
 
-################################## XML Parser ##################################
+func _parseCSVData(rawStr):
+	var array = IntArray()
+	var rows = rawStr.split("\n")
+	for row in rows:
+		var gids = row.split(",")
+		for gid in gids:
+			if gid and gid.length() > 0:
+				array.push_back(int(gid))
+	return array
+
+################################# XML Parser ##################################
 
 func _parseXMLContent(xmlContent):
 	var parser = XMLParser.new()
@@ -253,16 +270,6 @@ func _parseXMLContent(xmlContent):
 				# iterater current element
 				err = parser.read()
 	return meta
-
-func _parseCSVData(rawStr):
-	var array = IntArray()
-	var rows = rawStr.split("\n")
-	for row in rows:
-		var gids = row.split(",")
-		for gid in gids:
-			if gid and gid.length() > 0:
-				array.push_back(int(gid))
-	return array
 
 func _xmlNodeAttrValue(parser, attName, defaultV):
 	var res = defaultV
