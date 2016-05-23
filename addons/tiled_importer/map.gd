@@ -280,7 +280,10 @@ func _xmlNodeAttrValue(parser, attName, defaultV):
 		if tarType == TYPE_INT:
 			res = int(res)
 		elif tarType == TYPE_BOOL:
-			res = bool(res)
+			if res.length() > 0:
+				res = bool(int(res))
+			else:
+				res = false
 		elif tarType == TYPE_REAL:
 			res = float(res)
 		elif tarType == TYPE_COLOR:
