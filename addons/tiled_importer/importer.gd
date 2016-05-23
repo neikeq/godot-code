@@ -47,6 +47,9 @@ func import(path, meta):
 		# Save layers
 		var packer = PackedScene.new()
 		var node = Node2D.new()
+		var script = GDScript.new()
+		script.set_source_code(map.script)
+		node.set_script(script)
 		for l in map.layers:
 			if l.get_parent():
 				l.get_parent().remove_child(l)
@@ -89,7 +92,8 @@ func _ready():
 	dialog.get_ok().set_text("Import")
 	dialog.set_hide_on_ok(false)
 	dialog.get_ok().connect("pressed", self, "_confirmed")
-
+	dialog.set_pos(Vector2(get_viewport_rect().size.width/2 - dialog.get_rect().size.width/2, get_viewport_rect().size.height/2 - dialog.get_rect().size.height/2))
+	
 func _browseInput():
 	fileDialog.set_mode(FileDialog.MODE_OPEN_FILE)
 	fileDialog.set_access(FileDialog.ACCESS_FILESYSTEM)
