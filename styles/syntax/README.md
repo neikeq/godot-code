@@ -1,7 +1,7 @@
 Color schemes for godot script editor and class reference viewer.
 
 ### How to use these color schemes?
-Quit godot editor and replace settings to your `editor_settings.xml`.
+Import the theme file in script editor _File->Import Theme_.
 
 ---
 
